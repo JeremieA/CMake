@@ -1449,9 +1449,12 @@ void cmLocalGenerator::AddCompileOptions(
     // Filter flags acceptable to this language.
     cmsys::RegularExpression r(langFlagRegexStr);
     std::vector<std::string> opts;
-    if(const char* targetFlags = target->GetProperty("COMPILE_FLAGS"))
+    if (lang != "RC")
       {
-      cmSystemTools::ParseWindowsCommandLine(targetFlags, opts);
+      if (const char* targetFlags = target->GetProperty("COMPILE_FLAGS"))
+        {
+        cmSystemTools::ParseWindowsCommandLine(targetFlags, opts);
+        }
       }
     target->GetCompileOptions(opts, config, lang);
     for(std::vector<std::string>::const_iterator i = opts.begin();
@@ -1468,10 +1471,13 @@ void cmLocalGenerator::AddCompileOptions(
   else
     {
     // Use all flags.
-    if(const char* targetFlags = target->GetProperty("COMPILE_FLAGS"))
+    if (lang != "RC")
       {
-      // COMPILE_FLAGS are not escaped for historical reasons.
-      this->AppendFlags(flags, targetFlags);
+      if(const char* targetFlags = target->GetProperty("COMPILE_FLAGS"))
+        {
+        // COMPILE_FLAGS are not escaped for historical reasons.
+        this->AppendFlags(flags, targetFlags);
+        }
       }
     std::vector<std::string> opts;
     target->GetCompileOptions(opts, config, lang);
