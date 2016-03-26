@@ -277,6 +277,8 @@ public:
 		cmSystemTools::ReplaceString(string, "^", "^^");
 		cmSystemTools::ReplaceString(string, "$$", "^$");
  		cmSystemTools::ReplaceString(string, FASTBUILD_DOLLAR_TAG, "$");
+		cmSystemTools::ReplaceString(string, "\n\r", " ");
+		cmSystemTools::ReplaceString(string, "\n", " ");
 		//cmSystemTools::ReplaceString(string, "$$ConfigName$$", "$ConfigName$");
 		//cmSystemTools::ReplaceString(string, "^$ConfigName^$", "$ConfigName$");
 	}
