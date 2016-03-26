@@ -36,13 +36,16 @@ protected:
                                   const std::string& name);
   static int VisualStudioLink(std::vector<std::string>& args, int type);
   static int VisualStudioLinkIncremental(std::vector<std::string>& args,
+                                         std::vector<std::string>& original_args,
                                          int type,
                                          bool verbose);
   static int VisualStudioLinkNonIncremental(std::vector<std::string>& args,
+                                            std::vector<std::string>& original_args,
                                             int type,
                                             bool hasManifest,
                                             bool verbose);
   static int ParseVisualStudioLinkCommand(std::vector<std::string>& args,
+                                          std::vector<std::string>& original_args,
                                           std::vector<std::string>& command,
                                           std::string& targetName);
   static bool RunCommand(const char* comment,

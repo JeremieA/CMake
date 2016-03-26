@@ -1261,7 +1261,7 @@ int cmcmd::VisualStudioLink(std::vector<std::string>& args, int type)
       {
       std::cout << "Visual Studio Incremental Link with embedded manifests\n";
       }
-    return cmcmd::VisualStudioLinkIncremental(expandedArgs, type, verbose);
+    return cmcmd::VisualStudioLinkIncremental(expandedArgs, args, type, verbose);
     }
   if(verbose)
     {
@@ -1274,22 +1274,23 @@ int cmcmd::VisualStudioLink(std::vector<std::string>& args, int type)
       std::cout << "Visual Studio Incremental Link without manifests\n";
       }
     }
-  return cmcmd::VisualStudioLinkNonIncremental(expandedArgs,
+  return cmcmd::VisualStudioLinkNonIncremental(expandedArgs, args,
                                                type, hasManifest, verbose);
 }
 
 int cmcmd::ParseVisualStudioLinkCommand(std::vector<std::string>& args,
+                                        std::vector<std::string>& original_args,
                                         std::vector<std::string>& command,
                                         std::string& targetName)
 {
   std::vector<std::string>::iterator i = args.begin();
   i++; // skip -E
   i++; // skip vs_link_dll or vs_link_exe
-  command.push_back(*i);
+  //command.push_back(*i);
   i++; // move past link command
   for(; i != args.end(); ++i)
     {
-    command.push_back(*i);
+    //command.push_back(*i);
     if(i->find("/Fe") == 0)
       {
       targetName = i->substr(3);
@@ -1299,6 +1300,7 @@ int cmcmd::ParseVisualStudioLinkCommand(std::vector<std::string>& args,
       targetName = i->substr(5);
       }
     }
+  command.assign(original_args.begin() + 2, original_args.end());
   if(targetName.empty() || command.empty())
     {
     return -1;
@@ -1346,6 +1348,7 @@ bool cmcmd::RunCommand(const char* comment,
 }
 
 int cmcmd::VisualStudioLinkIncremental(std::vector<std::string>& args,
+                                       std::vector<std::string>& original_args,
                                        int type, bool verbose)
 {
   // This follows the steps listed here:
@@ -1372,7 +1375,7 @@ int cmcmd::VisualStudioLinkIncremental(std::vector<std::string>& args,
   //    manifest it is a short link.
   std::vector<std::string> linkCommand;
   std::string targetName;
-  if(cmcmd::ParseVisualStudioLinkCommand(args, linkCommand, targetName) == -1)
+  if(cmcmd::ParseVisualStudioLinkCommand(args, original_args, linkCommand, targetName) == -1)
     {
     return -1;
     }
@@ -1476,13 +1479,14 @@ int cmcmd::VisualStudioLinkIncremental(std::vector<std::string>& args,
 }
 
 int cmcmd::VisualStudioLinkNonIncremental(std::vector<std::string>& args,
+                                          std::vector<std::string>& original_args,
                                           int type,
                                           bool hasManifest,
                                           bool verbose)
 {
   std::vector<std::string> linkCommand;
   std::string targetName;
-  if(cmcmd::ParseVisualStudioLinkCommand(args, linkCommand, targetName) == -1)
+  if(cmcmd::ParseVisualStudioLinkCommand(args, original_args, linkCommand, targetName) == -1)
     {
     return -1;
     }
