@@ -63,11 +63,19 @@ public:
 
 	const std::vector<std::string> & GetConfigurations() const;
 
+    /** Set the generator-specific platform name.  Returns true if platform
+    is supported and false otherwise.  */
+    virtual bool SetGeneratorPlatform(std::string const& p, cmMakefile* mf);
+
+    std::string const& GetPlatformName() const;
+
 private:
 	class Factory;
 	class Detail;
 
 	std::vector<std::string> Configurations;
+    std::string DefaultPlatformName;
+    std::string GeneratorPlatform;
 };
 
 #endif

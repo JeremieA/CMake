@@ -1600,6 +1600,7 @@ public:
 		WriteSettings( context );
 		WriteCompilers( context );
 		WriteConfigurations( context );
+		WriteVSConfigurations( context );
 
 		// Sort targets
 
@@ -1607,6 +1608,9 @@ public:
 		WriteAliases( context, false );
 		WriteTargetDefinitions( context, true );
 		WriteAliases( context, true );
+
+		// Write Visual Studio Solution
+		WriteVSSolution(context);
 	}
 
 	static void WritePlaceholders(GenerationContext& context)
@@ -2635,6 +2639,9 @@ public:
 		// Output a list of aliases
 		WriteTargetAliases(context, target, linkableDeps, orderDeps);
 
+		// Output Visual Studio Project info
+		WriteVSProject(context, target);
+
 		context.fc.WritePopScope();
 	}
 
@@ -2851,6 +2858,224 @@ public:
 			context.fc.WritePopScope();
 		}
 	}
+
+	static void WriteVSConfigurations(GenerationContext& context)
+	{
+		context.fc.WriteSectionHeader("VisualStudio Project Generation");
+
+		context.fc.WriteVariable("ProjectCommon", "");
+		context.fc.WritePushScopeStruct();
+		context.fc.WriteVariable("ProjectBuildCommand", Quote("cd ^$(SolutionDir) &amp; fbuild -vs -dist -cache ^$(ProjectName)-^$(Configuration)"));
+		context.fc.WriteVariable("ProjectRebuildCommand", Quote("cd ^$(SolutionDir) &amp; fbuild -vs -dist -cache -clean ^$(ProjectName)-^$(Configuration)"));
+
+		// detect platform (only for MSVC)
+		std::string platformToolset;
+		// Translate the cmake compiler id into the PlatformToolset
+		cmMakefile* mf = context.root->GetMakefile();
+		if (mf != 0)
+		{
+			// figure out which language to use
+			// for now care only for C and C++
+			std::string compilerVar = "CMAKE_CXX_COMPILER";
+			if (context.self->GetLanguageEnabled("CXX") == false)
+			{
+				compilerVar = "CMAKE_C_COMPILER";
+			}
+
+			std::string compilerId = mf->GetSafeDefinition(compilerVar + "_ID");
+			std::string compilerVersion = mf->GetSafeDefinition(compilerVar + "_VERSION");
+			if (compilerId == "MSVC")
+			{
+				if (compilerVersion.compare(0, 3, "19.") != std::string::npos)
+				{
+					// Using vs2015 / vc14
+					platformToolset = "v140";
+				}
+				else if (compilerVersion.compare(0, 3, "18.") != std::string::npos)
+				{
+					// Using vs2013 / vc12
+					platformToolset = "v120";
+				}
+				else if (compilerVersion.compare(0, 3, "16.") != std::string::npos)
+				{
+					// Using vs2010 / vc10
+					platformToolset = "v100";
+				}
+			}
+		}
+		if (!platformToolset.empty())
+		{
+			context.fc.WriteVariable("PlatformToolset", Quote(platformToolset));
+		}
+		context.fc.WritePopScope();
+
+		// Iterate over all configurations and define them:
+		std::vector<std::string>::const_iterator
+			iter = context.self->GetConfigurations().begin(),
+			end = context.self->GetConfigurations().end();
+		for (; iter != end; ++iter)
+		{
+			const std::string & configName = *iter;
+			context.fc.WriteVariable("Project_" + configName, "");
+			context.fc.WritePushScopeStruct();
+
+			// Using base config
+			context.fc.WriteCommand("Using", ".ProjectCommon");
+
+			// Output platform (TODO: CURRENTLY ONLY HANDLED FOR WINDOWS)
+			context.fc.WriteVariable("Platform", Quote(context.self->GetPlatformName()));
+			context.fc.WriteVariable("Config", Quote(configName));
+
+			context.fc.WritePopScope();
+		}
+
+		// Write out a list of all Visual Studio project configs
+		context.fc.WriteArray("ProjectConfigs",
+			Wrap(context.self->GetConfigurations(), ".Project_", ""));
+	}
+
+	static void WriteVSProject(
+		GenerationContext& context,
+		cmTarget& target)
+	{
+		const std::string& targetName = target.GetName();
+
+		context.fc.WriteCommand("VCXProject",
+			Quote(targetName + "-project"));
+		context.fc.WritePushScope();
+
+		context.fc.WriteVariable("ProjectOutput", Quote(target.GetSupportDirectory() + "/" + targetName + ".vcxproj"));
+
+		//context.fc.WriteArray("ProjectConfigs", Wrap(context.self->GetConfigurations(), ".Project_",""));
+
+		std::vector<std::string> projectFiles;
+		std::vector<cmSourceFile*> sources;
+		for (std::vector<std::string>::const_iterator
+			iter = context.self->GetConfigurations().begin(),
+			end = context.self->GetConfigurations().end();
+			iter != end; ++iter)
+		{
+			const std::string & configName = *iter;
+			target.GetSourceFiles(sources, configName);
+		}
+		std::vector<cmSourceFile*>::const_iterator sourcesEnd
+			= cmRemoveDuplicates(sources);
+		for (std::vector<cmSourceFile*>::const_iterator si = sources.begin();
+		si != sourcesEnd; ++si)
+		{
+			cmSourceFile* sf = *si;
+			// don't add source files which have the GENERATED property set:
+			if (sf->GetPropertyAsBool("GENERATED"))
+			{
+				continue;
+			}
+			std::string const& sfp = sf->GetFullPath();
+			projectFiles.push_back(Quote(sfp));
+		}
+
+		context.fc.WriteArray("ProjectFiles", projectFiles);
+
+		context.fc.WritePopScope();
+	}
+
+	static void WriteVSSolution(
+		GenerationContext& context)
+	{
+		context.fc.WriteSectionHeader("VisualStudio Solution Generation");
+
+		std::string rootDirectory;
+		cmMakefile* mf = context.root->GetMakefile();
+		if (mf != 0)
+		{
+			rootDirectory = mf->GetStartOutputDirectory();
+			rootDirectory += "/";
+		}
+
+		context.fc.WriteCommand("VCXProject", Quote("ALL_BUILD-project"));
+		context.fc.WritePushScope();
+		context.fc.WriteVariable("ProjectOutput", Quote(rootDirectory + "ALL_BUILD.vcxproj"));
+		context.fc.WritePopScope();
+
+		context.fc.WriteCommand("VSSolution", Quote("solution"));
+		context.fc.WritePushScope();
+
+		std::string topLevelSlnName = rootDirectory;
+		topLevelSlnName += (mf != 0) ? mf->GetProjectName() : context.self->GetName();
+		topLevelSlnName += ".sln";
+
+		context.fc.WriteVariable("SolutionOutput", Quote(topLevelSlnName));
+
+		//context.fc.WriteArray("SolutionConfigs", Wrap(context.self->GetConfigurations(), ".config_",""));
+		context.fc.WriteVariable("SolutionConfigs", ".ProjectConfigs");
+
+		std::vector<std::string> targetsInRoot;
+		std::map<std::string,std::vector<std::string> > targetsInFolder;
+		targetsInRoot.push_back(Quote("ALL_BUILD-project"));
+
+		// Now iterate each target in order
+		for (OrderedTargets::iterator targetIter = context.orderedTargets.begin();
+		targetIter != context.orderedTargets.end();
+			++targetIter)
+		{
+			const cmTarget* constTarget = (*targetIter);
+			if (constTarget->GetType() == cmTarget::INTERFACE_LIBRARY)
+			{
+				continue;
+			}
+
+			TargetContextMap::iterator findResult = context.targetContexts.find(constTarget);
+			if (findResult == context.targetContexts.end())
+			{
+				continue;
+			}
+
+			cmTarget* target = findResult->second.target;
+			cmLocalFastbuildGenerator* lg = findResult->second.lg;
+
+			std::string folder;
+			const char* p = target->GetProperty("FOLDER");
+			if (p)
+			{
+				folder = p;
+			}
+			(folder.empty() ? targetsInRoot : targetsInFolder[folder]).push_back(Quote(target->GetName() + "-project"));
+		}
+		if (!targetsInRoot.empty())
+		{
+			context.fc.WriteArray("SolutionProjects", targetsInRoot);
+		}
+
+		int folderCount = 1;
+		std::vector<std::string> folders;
+		for (std::map<std::string, std::vector<std::string> >::const_iterator iter = targetsInFolder.begin(), itend = targetsInFolder.end();
+		iter != itend; ++iter)
+		{
+			const std::string& folderName = iter->first;
+			const std::vector<std::string>& projects = iter->second;
+
+			std::stringstream folderVarName;
+			folderVarName << "folder_" << (folderCount++);
+
+			std::string folderVarNameStr = folderVarName.str();
+
+			context.fc.WriteVariable(folderVarNameStr, "");
+			context.fc.WritePushScopeStruct();
+
+			context.fc.WriteVariable("Path", Quote(folderName));
+			context.fc.WriteArray("Projects", projects);
+
+			context.fc.WritePopScope();
+
+			folders.push_back("."+folderVarNameStr);
+		}
+
+		context.fc.WriteArray("SolutionFolders", folders);
+
+		context.fc.WriteVariable("SolutionBuildProject", Quote("ALL_BUILD-project"));
+
+		context.fc.WritePopScope();
+	}
+
 };
 
 //----------------------------------------------------------------------------
@@ -2863,6 +3088,7 @@ cmGlobalGeneratorFactory* cmGlobalFastbuildGenerator::NewFactory()
 cmGlobalFastbuildGenerator::cmGlobalFastbuildGenerator()
 {
 	this->FindMakeProgramFile = "CMakeFastbuildFindMake.cmake";
+	this->DefaultPlatformName = "Win32";
 }
 
 //----------------------------------------------------------------------------
@@ -2877,6 +3103,24 @@ std::string cmGlobalFastbuildGenerator::GetName() const
 	return fastbuildGeneratorName; 
 }
 
+//----------------------------------------------------------------------------
+bool cmGlobalFastbuildGenerator::SetGeneratorPlatform(std::string const& p, cmMakefile* mf)
+{
+	this->GeneratorPlatform = p;
+	// TODO: check the given platform
+	// return cmGlobalGenerator::SetGeneratorPlatform(p, mf);
+	return true;
+}
+
+//----------------------------------------------------------------------------
+std::string const& cmGlobalFastbuildGenerator::GetPlatformName() const
+{
+	if (!this->GeneratorPlatform.empty())
+	{
+		return this->GeneratorPlatform;
+	}
+	return this->DefaultPlatformName;
+}
 //----------------------------------------------------------------------------
 cmLocalGenerator *cmGlobalFastbuildGenerator::CreateLocalGenerator()
 {
