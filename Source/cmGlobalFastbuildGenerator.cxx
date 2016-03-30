@@ -1906,6 +1906,9 @@ public:
 		if (workingDirectory.empty())
 		{
 			workingDirectory = makefile->GetCurrentOutputDirectory();
+		}
+		if (workingDirectory.back() != '/')
+		{
 			workingDirectory += "/";
 		}
 
