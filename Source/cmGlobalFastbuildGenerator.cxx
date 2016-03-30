@@ -1313,11 +1313,30 @@ public:
 		const std::string& version, std::vector<std::string>& extraFiles)
 	{
 		// Output a list of files that are relative to $CompilerRoot$
-		return;
+		//return;
 
 		if (compilerID == "MSVC")
 		{
-			if (version.compare(0, 3, "18.") != std::string::npos)
+			if (version.compare(0, 3, "19.") != std::string::npos)
+			{
+				// Using vs2015
+				const char *vs2013_extraFiles[12] = {
+					"$CompilerRoot$\\c1.dll",
+					"$CompilerRoot$\\c1xx.dll",
+					"$CompilerRoot$\\c2.dll",
+					"$CompilerRoot$\\msobj140.dll",
+					"$CompilerRoot$\\mspdb140.dll",
+					"$CompilerRoot$\\mspdbsrv.exe", // not sure this one makes sense...
+					"$CompilerRoot$\\mspdbcore.dll",
+					"$CompilerRoot$\\mspft140.dll",
+					"$CompilerRoot$\\1033\\clui.dll",
+					"$CompilerRoot$\\..\\redist\\x86\\Microsoft.VC140.CRT\\msvcp140.dll",
+					"$CompilerRoot$\\..\\redist\\x86\\Microsoft.VC140.CRT\\vcruntime140.dll",
+					"$CompilerRoot$\\..\\redist\\x86\\Microsoft.VC140.CRT\\vccorlib140.dll"
+				};
+				extraFiles.insert(extraFiles.end(), &vs2013_extraFiles[0], &vs2013_extraFiles[12]);
+			}
+			else if (version.compare(0, 3, "18.") != std::string::npos)
 			{
 				// Using vs2013
 				const char *vs2013_extraFiles[13] = {
