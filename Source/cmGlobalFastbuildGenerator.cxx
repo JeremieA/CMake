@@ -3235,7 +3235,27 @@ public:
 					std::string linkerType = lg->GetMakefile()->GetSafeDefinition("CMAKE_" + language + "_COMPILER_ID");
 
 					context.fc.WriteVariable("Linker", Quote(executable));
+					
 					context.fc.WriteVariable("LinkerType", Quote(linkerType));
+
+					std::string libExecutable = "$Linker$";
+					// we must use the librarian (lib.exe) as link.exe won't accept /lib in a response file.
+					// Fastbuild chooses to write a response file if the arguments are too long:
+					if (linkerType == "MSVC" && linkCommand == "Library")
+					{
+						std::string flagsLower = flags;
+						std::transform(flagsLower.begin(), flagsLower.end(), flagsLower.begin(), ::tolower);
+						size_t found = flagsLower.find("/lib ");
+						if (found != std::string::npos)
+							flags = flags.replace(found, strlen("/lib "), "");
+
+						std::string exeLower = executable;
+						std::transform(exeLower.begin(), exeLower.end(), exeLower.begin(), ::tolower);
+						found = exeLower.find("link.exe");
+						if (found != std::string::npos)
+							libExecutable = executable.replace(found, strlen("link.exe"), "lib.exe");
+					}
+					
 					context.fc.WriteVariable("BaseLinkerOptions", Quote(flags));
 
 					context.fc.WriteVariable("LinkerOutput", "'$TargetOutput$'");
@@ -3283,7 +3303,7 @@ public:
 						// These variables are required by the Library command as well
 						// we just need to transfer the values in the linker variables
 						// to these locations
-						context.fc.WriteVariable("Librarian","'$Linker$'");
+						context.fc.WriteVariable("Librarian",Quote(libExecutable));
 						context.fc.WriteVariable("LibrarianOptions","'$LinkerOptions$'");
 						context.fc.WriteVariable("LibrarianOutput","'$LinkerOutput$'");
 
